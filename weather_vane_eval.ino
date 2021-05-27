@@ -1,11 +1,24 @@
 #define WIND_DIR_PIN 35
 #define LED           2  //Diagnostics using built-in LED
+#define RAIN_PIN     25  //reed switch based tick counter on tip bucket
+
+volatile int rainTicks = 0;
+// Variables used in software delay to supress spurious counts on rain_tip
+volatile unsigned long timeSinceLastTip = 0;
+volatile unsigned long validTimeSinceLastTip = 0;
+volatile unsigned long lastTip = 0;
+
 
 void setup() {
   // put your setup code here, to run once:
   pinMode(14, INPUT);
   pinMode(LED, OUTPUT);
   digitalWrite(LED, 0);
+
+  //Rainfall interrupt pin set up
+  pinMode(RAIN_PIN, INPUT);     // Rain sensor
+  delay(100); //possible settling time on pin to charge
+  attachInterrupt(digitalPinToInterrupt(RAIN_PIN), rainTick, FALLING);
   Serial.begin(115200);
 }
 
@@ -27,9 +40,25 @@ void loop() {
       break;
     }
   }
-  windPin= digitalRead(14);
-  digitalWrite(LED,!windPin);
+  windPin = digitalRead(14);
+  digitalWrite(LED, !windPin);
   Serial.printf("Wind speed switch %i\n", windPin);
   Serial.printf("Wind direction: %i - %i - %s\n", vin, windPosition, windDirText[windPosition]);
+  Serial.printf("\nRain ticks: %i\n\n\n", rainTicks);
   delay(250);
+}
+
+//ISR
+void rainTick(void)
+{
+
+
+  timeSinceLastTip = millis() - lastTip;
+  //software debounce attempt
+  if (timeSinceLastTip > 300)
+  {
+    validTimeSinceLastTip = timeSinceLastTip;
+    rainTicks++;
+    lastTip = millis();
+  }
 }
